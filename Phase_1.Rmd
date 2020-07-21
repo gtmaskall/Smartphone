@@ -1,0 +1,361 @@
+---
+title: "Smartphones Project: Phase 1"
+author: "Bliss Cohen"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float:
+      collapsed: FALSE
+    toc_depth: 5
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+
+```
+
+```{r}
+# load libraries
+
+library(tidyverse)
+library(data.table)
+library(knitr)
+library(kableExtra)
+library(readr)
+
+```
+
+### Objective for Phase 1
+
+Load, clean and join training and testing files to prepare for analysis:
+
+* Summary data (train and test)
+* Raw data (train and test)
+
+### Process
+
+#### 1. Download the Data
+
+The original data, dated 2012-12-10, can be downloaded [here](https://archive.ics.uci.edu/ml/datasets/human+activity+recognition+using+smartphones) after clicking on the "Data Folder" link.  I will ignore the _MACOSX folder and only copy the files in the UCI HAR Dataset.zip folder.  The _MACOSX folder is produced when a zip file is created on a Mac and is not needed.
+
+The following folders and files were present after copying and unzipping the [UCI HAR Dataset.zip](https://archive.ics.uci.edu/ml/machine-learning-databases/00240/):
+
+* test folder
+* train folder
+* .DS_Store (a Mac output that is not needed)
+* activity_labels.txt
+* features.txt
+* features_info.txt
+* README.txt
+
+Both the test and train folders contain these files:
+
+* Inertial Signals
+* subject_*.txt
+* X_*.txt
+* y_*.txt
+
+#### 2. Read in Some Files from Train Folder
+
+An examination of the files in the train folder led me to speculate the following:
+
+* X_train.txt
+    * A summary file where each observation is a window associated with 516 new features calculated from raw data
+* subject_train.txt.  
+    * Subject identifications for those people separated into train data
+* y_train.txt
+    * Activity codes corresponding to the 6 activities
+    
+The "Inertial Signals" folder seems to contain the raw data and will be investigated later.
+
+After trial and error with various read-in functions such as readr::read_file(), read_tsv(), read_delim(), read_fwf() and data.table::fread(), I determined that fread() worked best since it automatically split values into 516 separate columns, which matches the number of features.  In addition, fread() correctly labeled measurements as numeric data types.
+    
+**X_train.txt**
+
+```{r}
+
+X_train <- fread("UCI HAR Dataset\\train\\X_train.txt")
+
+```
+
+The X_train file contains `r nrow(X_train)` rows and `r ncol(X_train)` columns.  Each row is an observation window that is characterized by 561 features.  The features are currently not identified, so they are read in as generic vectors (V1, V2, etc.)  The table below shows a snippet of the X_train file.
+
+```{r}
+
+X_train[1:5, 1:10] %>% 
+  kable(caption = "First 5 Rows and 10 Columns of X_train") %>% 
+  kable_styling()
+
+```
+
+```{r results = 'hide'}
+
+# And looks like everything was read in as numbers, which is good
+
+# glimpse(X_train)
+
+```
+
+**subject_train.txt**
+
+From the Files tab in the RStudio window, I can click on "subject_train.txt" to get a sneak peek in the source editor.
+
+```{r}
+
+subject_train <- fread("UCI HAR Dataset\\train\\subject_train.txt")
+
+```
+
+The subject_train file contains one subject number in each of the `r nrow(subject_train)` rows.  Each subject corresponds to a window associated with the X_train file.
+
+After reading in the file, I determined there are 21 subjects numbered somewhere between 1-30 in the train folder, which accounts for 70% of the 30 total subjects, as explained in the "Data Set Information".
+
+```{r}
+
+subject_train %>% 
+  select(1) %>% 
+  distinct() %>% 
+  kable(caption = "Train Subject ID's",
+        align = 'c',
+        table.attr = "style='width:50%;'") %>% 
+  kable_styling()
+
+```
+
+**y_train.txt**
+
+I can click on "y_train.txt" in the Files window to get a sneak peek in the source editor.  The file yielded 6 distinct values in one column, which correspond to the 6 activities studied.  
+
+```{r}
+
+y_train <- fread("UCI HAR Dataset\\train\\y_train.txt")
+
+```
+
+```{r}
+
+y_train %>% 
+  select(1) %>% 
+  distinct() %>% 
+  kable(caption = "Values from y_train.txt",
+        align = 'c',
+        table.attr = "style='width:50%;'") %>%
+  kable_styling()
+
+```
+
+#### 3. Read in Features and Activities
+
+**features.txt**
+
+From what I understand, the raw data was aggregated into 561 features, which will ultimately correspond to X_train column headers.
+
+Below are the first 5 rows of the features.txt file.
+
+```{r}
+
+features <- fread("UCI HAR Dataset\\features.txt")
+
+```
+
+```{r}
+features[1:5] %>% 
+  kable(caption = "First 5 Rows of features.txt", 
+        table.attr = "style='width:50%;'",
+        align = 'c') %>% 
+  kable_styling()
+
+
+```
+
+**activity_labels.txt**
+
+The activity_labels.txt shows how the numeric values connect with their associated descriptions:
+
+```{r}
+
+activity_labels <- fread("UCI HAR Dataset\\activity_labels.txt")
+
+```
+
+```{r}
+
+activity_labels %>% 
+  kable(caption = "6 Activity Labels from activity_labels.txt",
+        table.attr = "style='width:50%;'",
+        align = c('c', 'l')) %>% 
+  kable_styling()
+
+```
+
+#### 4. Merge Features, Activities, and Subjects with X_train
+
+**Merge Features**
+
+I am speculating that text files are indexed.  In other words, the order of elements is purposeful and does not change.  If I am correct, then the ordered features listed in features.txt correspond to the ordered columns in the X_train file.  
+
+In order to "merge" the files, I will create column names from the features.txt file.  This was easier said than done.  Apparently, there are duplicate features (the same feature appears 2x).  Before I can apply the features as column names, I need to make them unique.
+
+```{r}
+
+# Count distinct features
+
+distinct_features <- features %>% 
+  select(2) %>% 
+  n_distinct()
+
+# identify rows associated with duplicate values
+
+is_duplicate <- features %>% 
+  select(2) %>% 
+  duplicated()
+
+# merge the is_duplicate with features so I can see which ones are "TRUE"
+
+features_ID_dups <- cbind(is_duplicate, features) 
+
+```
+
+```{r}
+
+dup_features <- features_ID_dups %>% 
+  filter(is_duplicate == TRUE) %>% 
+  select(1,3) %>% 
+  n_distinct()
+
+```
+
+There are `r distinct_features` distinct features out of the `r nrow(features)` listed (row difference = `r nrow(features)-distinct_features`).  The table below shows the `r dup_features` duplicate features, which correspond to the difference of `r nrow(features)-distinct_features` rows.
+
+```{r}
+
+features_ID_dups %>% 
+  filter(is_duplicate == TRUE) %>% 
+  select(1,3) %>% 
+  distinct() %>% 
+  arrange(V2) %>% 
+  kable(caption = "Duplicate Features") %>% 
+  kable_styling()
+
+```
+
+```{r}
+
+features_unique <- features %>% 
+  pull(2) %>% 
+  make.unique()
+
+num_unique_features <- features_unique %>% n_distinct()
+
+```
+
+The base::make.unique() function will be used to ensure that each feature is unique by adding a numeric extension .1 or .2 to replicate values.  After applying the function, I confirmed that there are now `r num_unique_features` unique features.
+
+The first 5 rows and 10 columns of the X_train file is shown below after converting the now-unique features to column names.
+
+```{r}
+# Convert unique features to column names
+
+names(X_train) <- features_unique
+
+```
+
+```{r}
+X_train[1:5, 1:10] %>% 
+  kable(caption = "First 5 Rows and 10 Columns of X_Train with Column Names (Features)") %>% 
+  kable_styling()
+
+```
+
+**Merge Activities and Subjects**
+
+The activity labels were first joined with the y_train file so that each activity value had a description, as summarized below.
+
+```{r}
+
+
+activity_join <- left_join(y_train, activity_labels,
+                           by = "V1")
+
+activity_join <- activity_join %>% 
+  rename("Activity_Value" = V1, "Activity_Label" = V2)
+
+```
+
+```{r}
+
+activity_join %>% 
+  group_by(Activity_Value, Activity_Label) %>% 
+  summarise("Number_Rows" = n()) %>% 
+  kable(caption = "y_train with Activity Labels",
+        table.attr = "style='width:50%;'",
+        align = c('c', 'l', 'c')) %>% 
+  kable_styling()
+
+```
+
+The above activity file was then joined with subjects.  The table below shows the number of rows associated with subjects and their activities.
+
+```{r}
+
+subject_train <- subject_train %>% 
+  rename("Subject_ID" = V1)
+
+activity_subject <- cbind(subject_train, activity_join)
+
+```
+
+```{r}
+
+activity_subject %>% 
+  group_by(Subject_ID, Activity_Value, Activity_Label) %>% 
+  summarise("Number_Rows" = n()) %>% 
+  kable(caption = "Summary of Train Subjects and Activities") %>% 
+  kable_styling()
+
+```
+
+The `r nrow(activity_subject)` rows from the activity_subject file was merged with the X_train file.  The table below shows a random sampling of 5 rows across the first 10 columns after associating activities and subjects with the window observations.
+
+```{r}
+
+X_train_join <- cbind(activity_subject, X_train)
+
+```
+
+```{r}
+
+X_train_join[sample(nrow(X_train_join),5), 1:10] %>% 
+  kable(caption = "Random 5 Rows and 10 Columns After Merging Activity with Window Observations") %>% 
+  kable_styling()
+
+```
+
+#### 5. Investigate Some Summary Statistics of Features
+
+Most of the calculations behind the features are not clear to me.  However, there seem to be some basic summary statistics like mean, sd, max, and min, so I will pull basic stats to see if the numbers make sense.  If the things look good, then I have more confidence that the features were applied to the correct columns.
+
+```{r results = 'hide'}
+
+colnames(X_train_join)
+
+```
+
+OK, so something is looking wonky.  My max values are lower than my min.  And I am getting negative standard deviations?  All of this is making me think that I did not correctly match features to columns.
+
+```{r}
+
+# Filter to key summary stats and look at summary
+
+Extract_common_stats <- X_train_join %>% 
+  select(1:3, "tBodyAcc-mean()-X", "tBodyAcc-std()-X",
+         "tBodyAcc-max()-X", "tBodyAcc-min()-X")
+
+# summary
+
+summary(Extract_common_stats)
+
+```
+
