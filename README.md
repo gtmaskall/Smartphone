@@ -32,7 +32,7 @@ This project will span multiple Phases:
     
 ### Data
 
-The original data, dated 2012-12-10, can be downloaded [here](https://archive.ics.uci.edu/ml/datasets/human+activity+recognition+using+smartphones) after clicking on the "Data Folder" link.  
+The original data, dated 2012-12-10, can be downloaded [here](https://archive.ics.uci.edu/ml/datasets/human+activity+recognition+using+smartphones) after clicking on the "Data Folder" link.  Data processing will be conducted in RStudio.
 
 ### License
 
