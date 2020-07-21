@@ -34,6 +34,12 @@ This project will span multiple Phases:
 
 The original data, dated 2012-12-10, can be downloaded [here](https://archive.ics.uci.edu/ml/datasets/human+activity+recognition+using+smartphones) after clicking on the "Data Folder" link.  Data processing will be conducted in RStudio.
 
+### Project Updates
+
+This [guide](https://www.finex.co/how-to-display-html-in-github/) describes the extra steps required to load a rendered HTML created via RMarkdown.  Git creates a new web address for the rendered HTML.  These new web addresses will be posted here since links don't seem to be immediately accessible from the repository.
+
+[Phase_1](https://b19356.github.io/Smartphone/Phase_1.html)
+
 ### License
 
 [1] Davide Anguita, Alessandro Ghio, Luca Oneto, Xavier Parra and Jorge L. Reyes-Ortiz. A Public Domain Dataset for Human Activity Recognition Using Smartphones. 21th European Symposium on Artificial Neural Networks, Computational Intelligence and Machine Learning, ESANN 2013. Bruges, Belgium 24-26 April 2013. 
